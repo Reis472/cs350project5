@@ -19,23 +19,20 @@
 using namespace std;
 
 struct inode{
-	string name; //max size of 128 characters
-	int size;
+	char name[255];
+	int size; //in bytes
 	int dblock[128];
 	char dummy[384];
-	inode(){
-		this -> size = 0;
-	}
 };
 //struct for inum so it can point to an inode
-struct inum{
+/*struct inum{
 	int num;
 	inode* nodeptr;
 	inum(){
 		this -> num = -1;
 		this -> nodeptr = nullptr;
 	}
-};
+};*/
 
 vector<inode*> imap;
 inum* inumList[40];
@@ -60,14 +57,40 @@ void import(string filename, string lfs){
 		cout << "The imap is currently full" << endl;
 	}
 	//check that lfs name isn't larger than 128 bytes
-	else if(lfs.length() > 128){
-		cout << "The name of the file should not exceed 128 bytes" << endl;
+	else if(lfs.length() > 255){
+		cout << "The name of the file should not exceed 255 bytes" << endl;
 	}
 	//part of check for file in filemap
 	else if(exist == true){
 		cout << "This lfs name is already in use" << endl;
 	}
 	else{
+		inode newNode;
+		//copying filename to new inode
+		for(int i = 0; i < lfs.length(); i++){
+			newNode.name[i] = lfs[i];
+		}
+		newNode.name[lfs.length()] = '\0';
+		int inumber = imap.size() + 1;
+		int size = 0; //in bytes
+		ifstream file(filename, ios::binary | ios::ate);
+		int fileLength = file.tellg();
+		int charCount = 0;
+		char buffer[BLOCK_SIZE] = {0};
+		file.open(filename);
+		for(int i = 0; i < fileLength; i++){
+			if(charCount == BLOCK_SIZE || i == fileLength-1){
+				//save and empty out buffer contents
+				memset(buffer, 0, sizeof(buffer));
+				charCount = 0;
+				size++;
+			}
+			file.get(buffer[i]);
+			charCount++;
+		}
+		newNode.size = size;
+	}
+	/*else{
 		inode* node = new inode();
 		node -> name = lfs;
 		ifstream file(filename, ios::binary | ios::ate);
@@ -96,11 +119,11 @@ void import(string filename, string lfs){
 
 		node -> size = fileLength;
 		imap.push_back(node); //adding inode to vector of inodes in use
-	}
+	}*/
 }
 
 void remove(string lfs){
-	//looking for the inode with the same lfs name
+	/*//looking for the inode with the same lfs name
 	for(int i = 0; i < imap.size(); i++){
 		if(imap[i] -> name == lfs){
 			for(int j = 0; j < 40; j++){
@@ -114,7 +137,7 @@ void remove(string lfs){
 			imap.erase(imap.begin()+i);
 			break;
 		}
-	}
+	}*/
 	//print statement in the event no match was found
 	cout << "That lfs file does not exist" << endl;
 }
