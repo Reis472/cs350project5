@@ -34,8 +34,13 @@ struct inode{
 	}
 };*/
 
-vector<inode*> imap;
-inum* inumList[40];
+unsigned int imap[IMAP_BLOCKS*BLOCK_SIZE];
+//inum* inumList[40];
+int current_segment = 0;
+int current_block = 0;
+int current_position = 0;
+char segment[SEGMENT_SIZE];
+char segment_summary[SEGMENT_BLOCKS][2];
 //initializing new list of inum
 void initInumList(){
 	for(int i = 0; i < 40; i++){
@@ -84,11 +89,34 @@ void import(string filename, string lfs){
 				memset(buffer, 0, sizeof(buffer));
 				charCount = 0;
 				size++;
+				memcpy(&segment[current_block * BLOCK_SIZE], buffer, fileLength);
 			}
 			file.get(buffer[i]);
 			charCount++;
 		}
 		newNode.size = size;
+		//FILEMAP UPDATE
+		fstream filemap("DRIVE/FILEMAP" ios::binary | ios::ate);
+		filemap.seekp(inumber * BLOCK_SIZE_FILEMAP);
+		filemap.write(1, 1); //1 indicates the block is valid
+		filemap.write(lfs.c_str(), lfs.length()+1);
+		filemap.close();
+		//WRITING INODE
+		segment_summary[current_block][0] = inumber;
+		segment_summary[current_block][1] = 1; //indicates valid and in use
+		current_block++;
+		//IMAP UPDATE
+		if(current_block == SEGMENT_BLOCKS){
+			//write out a full segment
+			fstream seg("DRIVE/SEGMENT"+to_string(current_segment));
+			seg.write(segment, SEGMENT_SIZE);
+			seg.close();
+			current_segment++;
+			current_block = 0;
+		}
+		imap[inumber] = current_position;
+		current_position = size+ charCount;
+		
 	}
 	/*else{
 		inode* node = new inode();
