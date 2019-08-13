@@ -115,7 +115,7 @@ void import(string filename, string lfs){
 			current_block = 0;
 		}
 		imap[inumber] = current_position;
-		current_position = size+ charCount;
+		current_position = (size*1024)+ charCount;
 		
 	}
 	/*else{
@@ -151,24 +151,103 @@ void import(string filename, string lfs){
 }
 
 void remove(string lfs){
-	/*//looking for the inode with the same lfs name
-	for(int i = 0; i < imap.size(); i++){
-		if(imap[i] -> name == lfs){
-			for(int j = 0; j < 40; j++){
-				//finding inum that corresponds to inode
-				if(inumList[j] -> nodeptr -> name == lfs){
-					filemap[inumList[j] -> num] = "empty";
-					inumList[j] -> nodeptr = nullptr;
-					inumList[j] -> num = -1;
-				}
+	int inumber = -1;
+	fstream filemap("DRIVE/FILEMAP", ios::binary | ios::ate);
+	for(int i=0; i<TOTAL_FILES; i++){
+		filemap.seekg(i*BLOCK_SIZE_FILEMAP);
+		char status[1];
+		filemap.read(status, 1);
+		if(status[0] == 1){
+			char temp[BLOCK_SIZE_FILEMAP-1];
+			filemap.read(temp, BLOCK_SIZE_FILEMAP-1);
+			string name(temp);
+			if(name == lfs);
+				filemap.close();
+				inumber = i;
 			}
-			imap.erase(imap.begin()+i);
-			break;
 		}
-	}*/
-	//print statement in the event no match was found
-	cout << "That lfs file does not exist" << endl;
+		break;
+	}
+	if(inumber == -1){
+		cout << "Filename does not exist" << endl;
+		return;
+	}
+	else{
+		fstream filemap("DRIVE/FILEMAP", ios::binary | ios::ate);
+		filemap.seekp(inumber*BLOCK_SIZE_FILEMAP);
+		filemap.write(0, 1); //marking this particular area in filemap no longer usable
+		filemap.close();
+		//may need to update the imap
+	}
 }
+
+void display(string lfs, string number, string startbyte){
+	int inumber = -1;
+	fstream filemap("DRIVE/FILEMAP", ios::binary | ios::ate);
+	for(int i=0; i<TOTAL_FILES; i++){
+		filemap.seekg(i*BLOCK_SIZE_FILEMAP);
+		char status[1];
+		filemap.read(status, 1);
+		if(status[0] == 1){
+			char temp[BLOCK_SIZE_FILEMAP-1];
+			filemap.read(temp, BLOCK_SIZE_FILEMAP-1);
+			string name(temp);
+			if(name == lfs);
+				filemap.close();
+				inumber = i;
+			}
+		}
+		break;
+	}
+	if(inumber == -1){
+		cout << "Filename does not exist" << endl;
+		return;
+	}
+	//finding the inode
+	inode temp;
+	unsigned int block_pos = imap[inumber];
+	unsigned int seg_num = (block_pos/1024)+1;
+	unsigned int pos = (block_pos%1024)*1024;
+	if(block_pos != (unsigned int) -1){
+		if(seg_num == MAX_SEGMENTS){
+			cout << "The expected file is out of bounds" << end;
+			return;
+		}
+		fstream segfile("DRIVE/SEGMENT"+to_string(seg_num), ios::binary | ios::ate);
+		segfile.seekg(pos);
+		char buf[1024];
+		segfile.read(buf, 1024);
+		memcpy(&temp, buf, sizeof(inode));
+		segfile.close();
+		int starting_point = stoi(startbyte);
+		int ending_point = stoi(number)+starting_point;
+		if(starting_point > temp.size){
+			cout << "Start point is larger than the content size" << endl;
+			return;
+		}
+		if(ending_point > temp.size){
+			ending_point = temp.size;
+		}
+		bool start = true;
+		for(int i = starting_point/1024; i < ending_point/1024; i++){
+			if(start == true){
+				pos = pos+starting_point;
+				start = false;
+			}
+			char buffer[1024];
+			fstream file("DRIVE/SEGMENT"+to_string(seg_num). ios::binary | ios::ate);
+			file.seekg(pos);
+			file.read(buffer, 1024);
+			file.close();
+			for(int j = 0; j < 1024; j++){
+				cout << buffer[i];
+			}
+		}
+		cout << endl;
+		return;
+	}
+	cout << "No block position was found" << endl;
+}	
 
 int main(int argc, char* argv[]){
 	return 0;
