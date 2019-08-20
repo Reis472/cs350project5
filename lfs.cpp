@@ -30,19 +30,20 @@ unsigned int checkpoint[40];
 int current_segment = 0;
 int current_block = 0;
 int current_position = 0;
+int inumber = 0;
 char segment[SEGMENT_SIZE];
 char segment_summary[SEGMENT_BLOCKS][2];
-char segment_status[64] = {0};
+char segment_status[64] = {0}; // 0 is clean 1 is dirty
 
 //initializing new list of inum
-void initInumList(){
+/*void initInumList(){
 	for(int i = 0; i < 40; i++){
 		inumList[i] = new inum();
 	}
-}
+}*/
 string filemap[40];
 void import(string filename, string lfs){
-	bool exist = false;
+	/*bool exist = false;
 	//check for if file exists in filemap
 	for(int i = 0; i < 40; i++){
 		if(filename == filemap[i]){
@@ -53,15 +54,12 @@ void import(string filename, string lfs){
 	//check if there's space in the imap
 	if(imap.size() == IMAP_BLOCKS){
 		cout << "The imap is currently full" << endl;
-	}
+	}*/
 	//check that lfs name isn't larger than 255 bytes
-	else if(lfs.length() > 255){
+	if(lfs.length() > 255){
 		cout << "The name of the file should not exceed 255 bytes" << endl;
 	}
 	//part of check for file in filemap
-	else if(exist == true){
-		cout << "This lfs name is already in use" << endl;
-	}
 	else{
 		inode newNode;
 		//copying filename to new inode
@@ -69,7 +67,6 @@ void import(string filename, string lfs){
 			newNode.name[i] = lfs[i];
 		}
 		newNode.name[lfs.length()] = '\0';
-		int inumber = imap.size() + 1;
 		int size = 0; //in bytes
 		ifstream file(filename, ios::binary | ios::ate);
 		int fileLength = file.tellg();
@@ -89,13 +86,15 @@ void import(string filename, string lfs){
 		}
 		newNode.size = size;
 		//FILEMAP UPDATE
-		fstream filemap("DRIVE/FILEMAP" ios::binary | ios::ate);
+		fstream filemap("DRIVE/FILEMAP", ios::binary | ios::ate);
 		filemap.seekp(inumber * BLOCK_SIZE_FILEMAP);
-		filemap.write(1, 1); //1 indicates the block is valid
+		const char temp[1] = {1};
+		filemap.write(temp, 1); //1 indicates the block is valid
 		filemap.write(lfs.c_str(), lfs.length()+1);
 		filemap.close();
 		//WRITING INODE
 		segment_summary[current_block][0] = inumber;
+		inumber++;
 		segment_summary[current_block][1] = 1; //indicates valid and in use
 		current_block++;
 		//IMAP UPDATE
@@ -114,7 +113,7 @@ void import(string filename, string lfs){
 }
 
 void remove(string lfs){
-	int inumber = -1;
+	int inum = -1;
 	fstream filemap("DRIVE/FILEMAP", ios::binary | ios::ate);
 	for(int i=0; i<TOTAL_FILES; i++){
 		filemap.seekg(i*BLOCK_SIZE_FILEMAP);
@@ -123,15 +122,15 @@ void remove(string lfs){
 		if(status[0] == 1){
 			char temp[BLOCK_SIZE_FILEMAP-1];
 			filemap.read(temp, BLOCK_SIZE_FILEMAP-1);
-			string name(temp);
-			if(name == lfs);
+			string name=temp;
+			if(name == lfs){
 				filemap.close();
-				inumber = i;
+				inum = i;
+				break;
 			}
 		}
-		break;
 	}
-	if(inumber == -1){
+	if(inum == -1){
 		cout << "Filename does not exist" << endl;
 		return;
 	}
@@ -145,7 +144,7 @@ void remove(string lfs){
 }
 
 void display(string lfs, string number, string startbyte){
-	int inumber = -1;
+	int inum = -1;
 	fstream filemap("DRIVE/FILEMAP", ios::binary | ios::ate);
 	for(int i=0; i<TOTAL_FILES; i++){
 		filemap.seekg(i*BLOCK_SIZE_FILEMAP);
@@ -155,14 +154,14 @@ void display(string lfs, string number, string startbyte){
 			char temp[BLOCK_SIZE_FILEMAP-1];
 			filemap.read(temp, BLOCK_SIZE_FILEMAP-1);
 			string name(temp);
-			if(name == lfs);
+			if(name == lfs){
 				filemap.close();
 				inumber = i;
 			}
 		}
 		break;
 	}
-	if(inumber == -1){
+	if(inum == -1){
 		cout << "Filename does not exist" << endl;
 		return;
 	}
@@ -173,7 +172,7 @@ void display(string lfs, string number, string startbyte){
 	unsigned int pos = (block_pos%1024)*1024;
 	if(block_pos != (unsigned int) -1){
 		if(seg_num == MAX_SEGMENTS){
-			cout << "The expected file is out of bounds" << end;
+			cout << "The expected file is out of bounds" << endl;
 			return;
 		}
 		fstream segfile("DRIVE/SEGMENT"+to_string(seg_num), ios::binary | ios::ate);
@@ -198,7 +197,7 @@ void display(string lfs, string number, string startbyte){
 				start = false;
 			}
 			char buffer[1024];
-			fstream file("DRIVE/SEGMENT"+to_string(seg_num). ios::binary | ios::ate);
+			fstream file("DRIVE/SEGMENT"+to_string(seg_num), ios::binary | ios::ate);
 			file.seekg(pos);
 			file.read(buffer, 1024);
 			file.close();
@@ -229,13 +228,59 @@ void list(){
 	in.close();
 }
 
-/*void clean(string value){
-	int val = stoi(value);
+void clean(string value){
+/*	int val = stoi(value);
 	char target_segments[val];
 	int num = 0;
+	unsigned int cleanInfo[1024][2];
+	unsigned int cleanedUpSeg[1024*1024];
+	unsigned int next = 0;
+	int current_target_seg = 0;
+	unsigned int targetSum[1024][2];
+	char targetSeg[SEGMENT_SIZE];
 
 	for(int i = 0; i < 64 && num < val; i++){
-*/
+		if(segment_status[i] == 1){
+			target_segments[num] = i;
+			num++;
+		}
+	}
+
+	if(num == 0){
+		cout << "All segments are clean" << endl;
+		return;
+	}
+
+	cout << num << " dirty segments were found of the " << val << " total being asked to be cleaned" << endl;
+	
+	for(int j = 0; j < 1024; j++){
+		cleanInfo[j][0] = (unsigned int) -1;
+		cleanInfo[j][1] = (unsigned int) -1;
+	}
+
+	for(int k = 0; k < num; k++){
+		current_target_seg = target_segments[0];
+		segment_status[k] = 0;
+		if(current_target_seg == current_segment){
+			memcpy(targetSum, segment_summary, SEGMENT_BLOCKS * BLOCK_SIZE);
+			memcpy(targetSeg, segment, SEGMENT_SIZE);
+		}
+		else{
+			char sumBuf[1024*1024];
+			fstream segfile("DRIVE/SEGMENT"+current_target_seg, ios::binary | ios::ate);
+			segfile.read(targetSeg, SEGMENT_SIZE);
+			segfile.read(sumBuf, 1024*1024);
+			memcpy(targetSum, sumBuf, 1024*1024);
+			segFile.close();
+		}
+		for(int h = 0; h < 1024; h++){
+			unsigned int tempInum = targetSum[h][0];
+			unsigned int tempBnum = targetSum[h][1];
+			if(tempInum != (unsigned int) -1 && tempBnum != (unsigned int) -1){
+				
+			
+*/	
+}
 
 void exit(){
 	//writing out checkpoint
