@@ -32,7 +32,7 @@ int current_block = 0;
 int current_position = 0;
 int inumber = 0;
 char segment[SEGMENT_SIZE];
-char segment_summary[SEGMENT_BLOCKS][2];
+unsigned int segment_summary[SEGMENT_BLOCKS][2]; //0 = block is free, 1 = block is occupied. second val relates to checkpoint
 char segment_status[64] = {0}; // 0 is clean 1 is dirty
 
 //initializing new list of inum
@@ -108,7 +108,11 @@ void import(string filename, string lfs){
 		}
 		imap[inumber] = current_position;
 		current_position = (size*1024)+ charCount;
-		
+		unsigned int checkpoint_pos = inumber/(SEGMENT_BLOCKS/4);
+		checkpoint[checkpoint_pos] = current_block + (current_segment * 1024);
+		segment_summary[current_block][0] = 1;
+		segment_summary[current_block][1] = checkpoint_pos;
+		current_block++;
 	}
 }
 
